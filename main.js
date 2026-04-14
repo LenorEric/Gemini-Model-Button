@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name     Gemini Model Switcher
 // @namespace     lenor_tamp_code
-// @version     10.1
+// @version     11.1
 // @description     将Gemini的切换不同模型并点击发送按钮集成为独立的三个按钮。只需点一下鼠标，即可使用自己想要的模型发送，增加快速切换模型的便捷性。支持 Gemini Web 英文和中文界面
 // @author     Lenor
 // @match     https://gemini.google.com/*
@@ -220,3 +220,4 @@
         injectUI();
     }, 1500);
 })();
+
