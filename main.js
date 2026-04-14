@@ -11,29 +11,39 @@
 // @updateURL https://update.greasyfork.org/scripts/562721/Gemini%20Model%20Switcher.meta.js
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
     const MODEL_CONFIG = {
         fast: {
-            name: 'Fast',
-            descriptions: ['Answers quickly', '快速回答']
+            name: ['Fast', '快速'],
+            descriptions: [' Answers quickly ', ' 快速回答 ']
         },
         thinking: {
-            name: 'Thinking',
-            descriptions: ['Solves complex problems', '解决复杂问题']
+            name: ['Thinking', '思考'],
+            descriptions: [' Solves complex problems ', ' 解决复杂问题 ']
         },
         pro: {
-            name: 'Pro',
+            name: ['Pro', 'Pro'],
             descriptions: [
-                'Advanced math and code with 3.1 Pro',
-                '使用 3.1 Pro 处理高阶数学和代码任务'
+                ' Advanced math and code with 3.1 Pro ',
+                ' 使用 3.1 Pro 处理高阶数学和代码任务 '
             ]
         }
     };
 
-    function getEl(xpath, context = document) {
-        return document.evaluate(xpath, context, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+    function getEl(xpath, context = document, expectedTagName = null) {
+        const result = document.evaluate(xpath, context, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+        const normalizedTagName = expectedTagName ? expectedTagName.toUpperCase() : null;
+
+        for (let i = 0; i < result.snapshotLength; i++) {
+            const element = result.snapshotItem(i);
+            if (!normalizedTagName || element.tagName === normalizedTagName) {
+                return element;
+            }
+        }
+
+        return null;
     }
 
     function toXPathLiteral(text) {
@@ -48,16 +58,15 @@
         return `concat('${text.split("'").join(`', "'", '`)}')`;
     }
 
+    function asArray(value) {
+        return Array.isArray(value) ? value : [value];
+    }
+
     function findFirstMatchingElement(texts, context = document) {
-        for (const text of texts) {
-            const exactTextMatch = getEl(`//*[normalize-space(text())=${toXPathLiteral(text)}]`, context);
+        for (const text of asArray(texts)) {
+            const exactTextMatch = getEl(`//*[text()=${toXPathLiteral(text)}]`, context, 'SPAN');
             if (exactTextMatch) {
                 return { element: exactTextMatch, matchedText: text };
-            }
-
-            const nestedTextMatch = getEl(`//*[normalize-space(.)=${toXPathLiteral(text)}]`, context);
-            if (nestedTextMatch) {
-                return { element: nestedTextMatch, matchedText: text };
             }
         }
 
@@ -71,11 +80,13 @@
             return;
         }
 
-        console.log(`[GeminiScript] 准备切换到: ${model.name}`);
+        const modelNames = asArray(model.name);
+        const modelDescriptions = asArray(model.descriptions);
 
-        const targetXpath = `//*[normalize-space(text())=${toXPathLiteral(model.name)}]`;
-        const currentModel = getEl(targetXpath);
-        if (currentModel && currentModel.tagName === 'SPAN') {
+        console.log(`[GeminiScript] 准备切换到: ${modelNames.join(' / ')}`);
+
+        const currentModel = findFirstMatchingElement(modelNames);
+        if (currentModel && currentModel.element.tagName === 'SPAN') {
             console.log('[GeminiScript] 已经是这个模型了喵');
         } else {
             const switcherBtn = getEl('//bard-mode-switcher//button');
@@ -86,21 +97,19 @@
 
             switcherBtn.click();
 
-            const menuOption = findFirstMatchingElement(model.descriptions);
+            const menuOption = findFirstMatchingElement(modelDescriptions);
 
             if (menuOption) {
                 console.log(`[GeminiScript] 找到菜单项 "${menuOption.matchedText}"，点击中...`);
                 menuOption.element.click();
             } else {
-                console.error(`[GeminiScript] 未找到这些文字中的任意一个: ${model.descriptions.join(' / ')}`);
+                console.error(`[GeminiScript] 未找到这些文字中的任意一个: ${modelDescriptions.join(' / ')}`);
                 switcherBtn.click();
                 return;
             }
         }
 
-        let sendBtn = getEl("//button[contains(@aria-label, 'Send')]") ||
-                      getEl("//button[contains(@aria-label, '发送')]") ||
-                      getEl("//button[contains(@class, 'send-button')]");
+        let sendBtn = getEl("//button[contains(@class, 'send-button')]");
 
         if (!sendBtn) {
             console.log('[GeminiScript] 第一次找到的发送按钮不对');
