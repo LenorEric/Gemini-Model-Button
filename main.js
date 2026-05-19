@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name     Gemini Model Switcher
 // @namespace     lenor_tamp_code
-// @version     11.1
-// @description     将Gemini的切换不同模型并点击发送按钮集成为独立的三个按钮。只需点一下鼠标，即可使用自己想要的模型发送，增加快速切换模型的便捷性。支持 Gemini Web 英文和中文界面
+// @version     12.0
+// @description     将Gemini的切换不同模型并点击发送按钮集成为独立的三个按钮。只需点一下鼠标，即可使用自己想要的模型发送，增加快速切换模型的便捷性。支持 Gemini Web 英文和中文界面。同时隐藏侧边栏中无用的内容
 // @author     Lenor
 // @match     https://gemini.google.com/*
 // @website      https://github.com/LenorEric/Gemini-Model-Button
@@ -17,17 +17,17 @@
     const MODEL_CONFIG = {
         fast: {
             name: ['Fast', '快速'],
-            descriptions: [' Answers quickly ', ' 快速回答 ']
+            descriptions: ['Answers quickly', '快速回答']
         },
         thinking: {
             name: ['Thinking', '思考'],
-            descriptions: [' Solves complex problems ', ' 解决复杂问题 ']
+            descriptions: ['Solves complex problems', '解决复杂问题']
         },
         pro: {
             name: ['Pro', 'Pro'],
             descriptions: [
-                ' Advanced math and code with 3.1 Pro ',
-                ' 使用 3.1 Pro 处理高阶数学和代码任务 '
+                'Advanced math and code with 3.1 Pro',
+                '使用 3.1 Pro 处理高阶数学和代码任务'
             ]
         }
     };
@@ -64,40 +64,58 @@
 
     function findFirstMatchingElement(texts, context = document) {
         for (const text of asArray(texts)) {
-            const exactTextMatch = getEl(`//*[text()=${toXPathLiteral(text)}]`, context, 'SPAN');
-            if (exactTextMatch) {
-                return { element: exactTextMatch, matchedText: text };
+            const exactTextMatch1 = getEl(`//*[text()=${toXPathLiteral(text)}]`, context, 'SPAN');
+            if (exactTextMatch1) {
+                return { element: exactTextMatch1, matchedText: text };
+            }
+            const exactTextMatch2 = getEl(`//*[text()=${toXPathLiteral(text)}]`, context, 'DIV');
+            if (exactTextMatch2) {
+                return { element: exactTextMatch2, matchedText: text };
             }
         }
 
         return null;
     }
 
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
     async function switchAndSend(modelKey) {
         const model = MODEL_CONFIG[modelKey];
         if (!model) {
-            console.error(`[GeminiScript] 未知模型 key: ${modelKey}`);
+            console.error(`[GeminiScript] 未知模型喵 key: ${modelKey}`);
             return;
         }
 
         const modelNames = asArray(model.name);
         const modelDescriptions = asArray(model.descriptions);
 
-        console.log(`[GeminiScript] 准备切换到: ${modelNames.join(' / ')}`);
+        console.log(`[GeminiScript] 准备切换到: ${modelNames.join(' / ')} 喵`);
 
         const currentModel = findFirstMatchingElement(modelNames);
+
         if (currentModel && currentModel.element.tagName === 'SPAN') {
             console.log('[GeminiScript] 已经是这个模型了喵');
         } else {
             const switcherBtn = getEl('//bard-mode-switcher//button');
             if (!switcherBtn) {
-                console.error('[GeminiScript] 找不到菜单触发按钮');
+                console.error('[GeminiScript] 找不到菜单触发按钮喵');
                 return;
             }
 
             switcherBtn.click();
 
-            const menuOption = findFirstMatchingElement(modelDescriptions);
+            let menuOption = null;
+            let attempts = 0;
+            const maxAttempts = 10;
+
+            while (attempts < maxAttempts) {
+                await delay(2);
+                attempts++;
+                menuOption = findFirstMatchingElement(modelDescriptions);
+                if (menuOption) {
+                    break;
+                }
+            }
 
             if (menuOption) {
                 console.log(`[GeminiScript] 找到菜单项 "${menuOption.matchedText}"，点击中...`);
@@ -109,12 +127,7 @@
             }
         }
 
-        let sendBtn = getEl("//button[contains(@class, 'send-button')]");
-
-        if (!sendBtn) {
-            console.log('[GeminiScript] 第一次找到的发送按钮不对');
-            sendBtn = getEl("//input-area-v2//div[contains(@class, 'input-area-container')]//button[not(@disabled)]");
-        }
+        const sendBtn = getEl("//gem-icon-button[contains(@class, 'send-button')]", document, "GEM-ICON-BUTTON");
 
         if (sendBtn) {
             console.log('[GeminiScript] 点击发送');
@@ -126,8 +139,8 @@
 
     function hideSidebarNotebookLm() {
         const selectorsToHide = [
-            '#app-root > main > side-navigation-v2 > bard-sidenav-container > bard-sidenav > side-navigation-content > div > div > infinite-scroller > project-sidenav-list > div > div',
-            '#app-root > main > side-navigation-v2 > bard-sidenav-container > bard-sidenav > side-navigation-content > div > div > infinite-scroller > project-sidenav-list > div > side-nav-entry-button.new-project-button'
+            '#app-root > main > side-navigation-v2 > bard-sidenav-container > bard-sidenav > side-navigation-content > div > div > infinite-scroller > mat-nav-list',
+            '#app-root > main > side-navigation-v2 > bard-sidenav-container > bard-sidenav > side-navigation-content > div > div > infinite-scroller > expandable-section:nth-child(4)'
         ];
 
         for (const selector of selectorsToHide) {
