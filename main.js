@@ -15,21 +15,48 @@
     'use strict';
 
     const MODEL_CONFIG = {
-        fast: {
-            name: ['Fast', '快速'],
-            descriptions: ['Answers quickly', '快速回答']
+        lite: {
+            label: 'Lite',
+            currentBaseTexts: ['Flash-Lite'],
+            menuTexts: ['3.1 Flash-Lite', ' 3.1 Flash-Lite '],
+            effort: 'standard'
         },
-        thinking: {
-            name: ['Thinking', '思考'],
-            descriptions: ['Solves complex problems', '解决复杂问题']
+        liteThinking: {
+            label: 'Lite-T',
+            currentBaseTexts: ['Flash-Lite'],
+            menuTexts: ['3.1 Flash-Lite', ' 3.1 Flash-Lite '],
+            effort: 'extended'
         },
-        pro: {
-            name: ['Pro', 'Pro'],
-            descriptions: [
-                'Advanced math and code with 3.1 Pro',
-                '使用 3.1 Pro 处理高阶数学和代码任务'
-            ]
+        flash: {
+            label: 'Flash',
+            currentBaseTexts: ['Flash'],
+            menuTexts: ['3 Flash', ' 3 Flash '],
+            effort: 'standard'
+        },
+        flashThinking: {
+            label: 'Flash-T',
+            currentBaseTexts: ['Flash'],
+            menuTexts: ['3 Flash', ' 3 Flash '],
+            effort: 'extended'
+        },
+        proStandard: {
+            label: 'Pro-S',
+            currentBaseTexts: ['Pro'],
+            menuTexts: ['3.1 Pro', ' 3.1 Pro '],
+            effort: 'standard'
+        },
+        proExtended: {
+            label: 'Pro-E',
+            currentBaseTexts: ['Pro'],
+            menuTexts: ['3.1 Pro', ' 3.1 Pro '],
+            effort: 'extended'
         }
+    };
+
+    const THINKING_LEVEL_TEXTS = ['Thinking level', ' Thinking level '];
+    const EFFORT_TEXTS = {
+        standard: ['Standard', ' Standard '],
+        extended: ['Extended', ' Extended ']
     };
 
     function getEl(xpath, context = document, expectedTagName = null) {
@@ -64,13 +91,21 @@
 
     function findFirstMatchingElement(texts, context = document) {
         for (const text of asArray(texts)) {
-            const exactTextMatch1 = getEl(`//*[text()=${toXPathLiteral(text)}]`, context, 'SPAN');
-            if (exactTextMatch1) {
-                return { element: exactTextMatch1, matchedText: text };
-            }
-            const exactTextMatch2 = getEl(`//*[text()=${toXPathLiteral(text)}]`, context, 'DIV');
-            if (exactTextMatch2) {
-                return { element: exactTextMatch2, matchedText: text };
+            const normalizedText = text.trim();
+            const textMatchers = [
+                `text()=${toXPathLiteral(text)}`,
+                `normalize-space(text())=${toXPathLiteral(normalizedText)}`
+            ];
+
+            for (const matcher of textMatchers) {
+                const exactTextMatch1 = getEl(`.//*[${matcher}]`, context, 'SPAN');
+                if (exactTextMatch1) {
+                    return { element: exactTextMatch1, matchedText: text };
+                }
+                const exactTextMatch2 = getEl(`.//*[${matcher}]`, context, 'DIV');
+                if (exactTextMatch2) {
+                    return { element: exactTextMatch2, matchedText: text };
+                }
             }
         }
 
@@ -78,62 +113,156 @@
     }
 
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    let isSwitching = false;
+
+    function getSwitcherButton() {
+        return getEl('//input-area-v2//bard-mode-switcher//button') || getEl('//bard-mode-switcher//button');
+    }
+
+    function getModelButtonBox(switcherBtn = getSwitcherButton()) {
+        if (!switcherBtn) {
+            return null;
+        }
+
+        return switcherBtn.querySelector('.mdc-button__label') || switcherBtn;
+    }
+
+    function getCurrentSelection(model, switcherBtn = getSwitcherButton()) {
+        const modelButtonBox = getModelButtonBox(switcherBtn);
+        if (!modelButtonBox) {
+            return null;
+        }
+
+        const currentBase = findFirstMatchingElement(model.currentBaseTexts, modelButtonBox);
+        const currentExtended = findFirstMatchingElement(EFFORT_TEXTS.extended, modelButtonBox);
+        const currentEffort = currentExtended ? 'extended' : 'standard';
+
+        return {
+            baseMatches: Boolean(currentBase),
+            effortMatches: currentEffort === model.effort,
+            currentEffort
+        };
+    }
+
+    async function waitForMatchingElement(texts, context = document, timeoutMs = 1500, intervalMs = 50) {
+        const start = Date.now();
+
+        while (Date.now() - start <= timeoutMs) {
+            const match = findFirstMatchingElement(texts, context);
+            if (match) {
+                return match;
+            }
+
+            await delay(intervalMs);
+        }
+
+        return null;
+    }
+
+    async function selectBaseModel(switcherBtn, model) {
+        switcherBtn.click();
+
+        const menuOption = await waitForMatchingElement(model.menuTexts);
+        if (!menuOption) {
+            console.error(`[GeminiScript] 未找到基础模型: ${model.menuTexts.join(' / ')}`);
+            switcherBtn.click();
+            return false;
+        }
+
+        console.log(`[GeminiScript] 选择基础模型 "${menuOption.matchedText}"`);
+        menuOption.element.click();
+        return true;
+    }
+
+    async function selectThinkingEffort(targetEffort) {
+        const switcherBtn = getSwitcherButton();
+        if (!switcherBtn) {
+            console.error('[GeminiScript] 找不到菜单触发按钮');
+            return false;
+        }
+
+        switcherBtn.click();
+
+        const thinkingLevel = await waitForMatchingElement(THINKING_LEVEL_TEXTS);
+        if (!thinkingLevel) {
+            console.error('[GeminiScript] 找不到 Thinking level 按钮');
+            switcherBtn.click();
+            return false;
+        }
+
+        thinkingLevel.element.click();
+
+        const effortOption = await waitForMatchingElement(EFFORT_TEXTS[targetEffort]);
+        if (!effortOption) {
+            console.error(`[GeminiScript] 找不到思考等级: ${EFFORT_TEXTS[targetEffort].join(' / ')}`);
+            return false;
+        }
+
+        console.log(`[GeminiScript] 选择思考等级 "${effortOption.matchedText}"`);
+        effortOption.element.click();
+        return true;
+    }
 
     async function switchAndSend(modelKey) {
+        if (isSwitching) {
+            console.warn('[GeminiScript] 正在切换模型，请稍候');
+            return;
+        }
+
         const model = MODEL_CONFIG[modelKey];
         if (!model) {
             console.error(`[GeminiScript] 未知模型喵 key: ${modelKey}`);
             return;
         }
 
-        const modelNames = asArray(model.name);
-        const modelDescriptions = asArray(model.descriptions);
+        isSwitching = true;
 
-        console.log(`[GeminiScript] 准备切换到: ${modelNames.join(' / ')} 喵`);
-
-        const currentModel = findFirstMatchingElement(modelNames);
-
-        if (currentModel && currentModel.element.tagName === 'SPAN') {
-            console.log('[GeminiScript] 已经是这个模型了喵');
-        } else {
-            const switcherBtn = getEl('//bard-mode-switcher//button');
+        try {
+            const switcherBtn = getSwitcherButton();
             if (!switcherBtn) {
-                console.error('[GeminiScript] 找不到菜单触发按钮喵');
+                console.error('[GeminiScript] 找不到菜单触发按钮');
                 return;
             }
 
-            switcherBtn.click();
+            const currentSelection = getCurrentSelection(model, switcherBtn);
+            if (!currentSelection) {
+                console.error('[GeminiScript] 找不到当前模型按钮区域');
+                return;
+            }
 
-            let menuOption = null;
-            let attempts = 0;
-            const maxAttempts = 10;
+            console.log(`[GeminiScript] 准备切换到: ${model.label}`);
 
-            while (attempts < maxAttempts) {
-                await delay(2);
-                attempts++;
-                menuOption = findFirstMatchingElement(modelDescriptions);
-                if (menuOption) {
-                    break;
+            let baseChanged = false;
+            if (!currentSelection.baseMatches) {
+                baseChanged = await selectBaseModel(switcherBtn, model);
+                if (!baseChanged) {
+                    return;
                 }
+                await delay(250);
             }
 
-            if (menuOption) {
-                console.log(`[GeminiScript] 找到菜单项 "${menuOption.matchedText}"，点击中...`);
-                menuOption.element.click();
+            const shouldSelectEffort = model.effort === 'extended'
+                ? baseChanged || !currentSelection.effortMatches
+                : !baseChanged && !currentSelection.effortMatches;
+
+            if (shouldSelectEffort) {
+                const effortSelected = await selectThinkingEffort(model.effort);
+                if (!effortSelected) {
+                    return;
+                }
+                await delay(150);
+            }
+
+            const sendBtn = getEl("//gem-icon-button[contains(@class, 'send-button')]", document, "GEM-ICON-BUTTON");
+
+            if (sendBtn) {
+                console.log('[GeminiScript] 点击发送');
+                sendBtn.click();
             } else {
-                console.error(`[GeminiScript] 未找到这些文字中的任意一个: ${modelDescriptions.join(' / ')}`);
-                switcherBtn.click();
-                return;
+                console.error('[GeminiScript] 找不到发送按钮');
             }
-        }
-
-        const sendBtn = getEl("//gem-icon-button[contains(@class, 'send-button')]", document, "GEM-ICON-BUTTON");
-
-        if (sendBtn) {
-            console.log('[GeminiScript] 点击发送');
-            sendBtn.click();
-        } else {
-            console.error('[GeminiScript] 找不到发送按钮');
+        } finally {
+            isSwitching = false;
         }
     }
 
@@ -168,10 +297,11 @@
         const container = document.createElement('div');
         container.id = 'gemini-vertical-switcher';
         container.style.position = 'absolute';
-        container.style.right = '-100px';
+        container.style.right = '-175px';
         container.style.bottom = '0px';
-        container.style.display = 'flex';
-        container.style.flexDirection = 'column';
+        container.style.display = 'grid';
+        container.style.gridTemplateColumns = 'repeat(2, 80px)';
+        container.style.gridTemplateRows = 'repeat(3, 38px)';
         container.style.gap = '5px';
         container.style.zIndex = '100';
 
@@ -214,9 +344,12 @@
             return btn;
         };
 
-        container.appendChild(createBtn('Fast', 'fast', '#34a853', '#2e8b46'));
-        container.appendChild(createBtn('Thinking', 'thinking', '#4285f4', '#3367d6'));
-        container.appendChild(createBtn('Pro', 'pro', '#9c27b0', '#7b1fa2'));
+        container.appendChild(createBtn('Lite', 'lite', '#34a853', '#2e8b46'));
+        container.appendChild(createBtn('Lite-T', 'liteThinking', '#0f9d58', '#0b8043'));
+        container.appendChild(createBtn('Flash', 'flash', '#4285f4', '#3367d6'));
+        container.appendChild(createBtn('Flash-T', 'flashThinking', '#1a73e8', '#174ea6'));
+        container.appendChild(createBtn('Pro-S', 'proStandard', '#9c27b0', '#7b1fa2'));
+        container.appendChild(createBtn('Pro-E', 'proExtended', '#673ab7', '#512da8'));
 
         inputArea.appendChild(container);
     }
