@@ -1,8 +1,10 @@
 // ==UserScript==
-// @name     Gemini Model Switcher
+// @name Gemini Model Switcher
+// @description Integrate Gemini's model-switching and send actions into standalone buttons. With just a single click, you can send your prompt using your preferred model, making quick model switching much more convenient. This feature only supports the English version of Gemini Web. It also hides unnecessary content in the sidebar.
+// @name:zh-CN     Gemini模型切换器
+// @description:zh-CN     将Gemini的切换不同模型并点击发送按钮集成为独立的按钮。只需点一下鼠标，即可使用自己想要的模型发送，增加快速切换模型的便捷性。仅支持 Gemini Web 英文。同时隐藏侧边栏中无用的内容
 // @namespace     lenor_tamp_code
-// @version     12.0
-// @description     将Gemini的切换不同模型并点击发送按钮集成为独立的三个按钮。只需点一下鼠标，即可使用自己想要的模型发送，增加快速切换模型的便捷性。支持 Gemini Web 英文和中文界面。同时隐藏侧边栏中无用的内容
+// @version     13.5
 // @author     Lenor
 // @match     https://gemini.google.com/*
 // @website      https://github.com/LenorEric/Gemini-Model-Button
@@ -18,45 +20,45 @@
         lite: {
             label: 'Lite',
             currentBaseTexts: ['Flash-Lite'],
-            menuTexts: ['3.1 Flash-Lite', ' 3.1 Flash-Lite '],
+            menuTexts: [' 3.1 Flash-Lite ', ' 3.1 Flash-Lite '],
             effort: 'standard'
         },
         liteThinking: {
             label: 'Lite-T',
             currentBaseTexts: ['Flash-Lite'],
-            menuTexts: ['3.1 Flash-Lite', ' 3.1 Flash-Lite '],
+            menuTexts: [' 3.1 Flash-Lite ', ' 3.1 Flash-Lite '],
             effort: 'extended'
         },
         flash: {
             label: 'Flash',
             currentBaseTexts: ['Flash'],
-            menuTexts: ['3 Flash', ' 3 Flash '],
+            menuTexts: [' 3.5 Flash ', ' 3.5 Flash '],
             effort: 'standard'
         },
         flashThinking: {
             label: 'Flash-T',
             currentBaseTexts: ['Flash'],
-            menuTexts: ['3 Flash', ' 3 Flash '],
+            menuTexts: [' 3.5 Flash ', ' 3.5 Flash '],
             effort: 'extended'
         },
         proStandard: {
             label: 'Pro-S',
             currentBaseTexts: ['Pro'],
-            menuTexts: ['3.1 Pro', ' 3.1 Pro '],
+            menuTexts: [' 3.1 Pro ', ' 3.1 Pro '],
             effort: 'standard'
         },
         proExtended: {
             label: 'Pro-E',
             currentBaseTexts: ['Pro'],
-            menuTexts: ['3.1 Pro', ' 3.1 Pro '],
+            menuTexts: [' 3.1 Pro ', ' 3.1 Pro '],
             effort: 'extended'
         }
     };
 
-    const THINKING_LEVEL_TEXTS = ['Thinking level', ' Thinking level '];
+    const THINKING_LEVEL_TEXTS = [' Thinking level ', ' 思考等级 '];
     const EFFORT_TEXTS = {
-        standard: ['Standard', ' Standard '],
-        extended: ['Extended', ' Extended ']
+        standard: [' Standard ', ' 标准 '],
+        extended: [' Extended ', ' 拓展 ']
     };
 
     function getEl(xpath, context = document, expectedTagName = null) {
